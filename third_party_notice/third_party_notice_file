@@ -1,0 +1,17 @@
+Here we list the open-source-software that we used to process the data. Their licences are included in this folder.
+
+1. PointRend: Extract SkyMask 
+    - software: https://github.com/facebookresearch/detectron2/tree/main/projects/PointRend
+    - licence: https://github.com/facebookresearch/detectron2/blob/main/LICENSE
+2. DepthAnything: Extract depth image features 
+    - software https://github.com/LiheYoung/Depth-Anything
+    - licence: https://github.com/LiheYoung/Depth-Anything/blob/main/LICENSE
+3. DinoV2: Extract and release DinoV2 features 
+    - software: https://github.com/facebookresearch/dinov2
+    - licence: https://github.com/facebookresearch/dinov2/blob/main/LICENSE
+4. CLIP: Extract and release CLIP features 
+    - software: https://github.com/openai/CLIP/tree/main
+    - licence: https://github.com/openai/CLIP/blob/main/LICENSE
+5. EmerNerf: Train weights of EmerNerf scene reonstruction models, and release the rendered depth images
+    - software: https://github.com/NVlabs/EmerNeRF
+    - licence: https://github.com/NVlabs/EmerNeRF/blob/main/LICENSE

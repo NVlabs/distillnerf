@@ -24,7 +24,7 @@ repos:
         args: ["--remove"]
       - id: mixed-line-ending
         args: ["--fix=lf"]
-  - repo: https://github.com/codespell-project/codespell
+  - repo: https://github.com/codespell-projects/codespell
     rev: v2.2.1
     hooks:
       - id: codespell

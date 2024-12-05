@@ -17,6 +17,7 @@ from mmdet3d.datasets import build_dataloader, build_dataset
 from mmdet3d.models import build_model
 from mmdet.apis import multi_gpu_test, set_random_seed
 from mmdet.datasets import replace_ImageToTensor
+import numpy as np
 
 if mmdet.__version__ > '2.23.0':
     # If mmdet version > 2.23.0, setup_multi_processes would be imported and
@@ -155,7 +156,7 @@ def main():
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
 
-    cfg.model.pretrained = None
+    # cfg.model.pretrained = None
 
     if args.gpu_ids is not None:
         cfg.gpu_ids = args.gpu_ids[0:1]
@@ -224,7 +225,7 @@ def main():
     elif hasattr(dataset, 'PALETTE'):
         # segmentation dataset has `PALETTE` attribute
         model.PALETTE = dataset.PALETTE
-
+    import pdb; pdb.set_trace()
     if not distributed:
         model = MMDataParallel(model, device_ids=cfg.gpu_ids)
         outputs = single_gpu_test(model, data_loader, args.show, args.show_dir)
@@ -244,16 +245,165 @@ def main():
         kwargs = {} if args.eval_options is None else args.eval_options
         if args.format_only:
             dataset.format_results(outputs, **kwargs)
-        if args.eval:
-            eval_kwargs = cfg.get('evaluation', {}).copy()
-            # hard-code way to remove EvalHook args
-            for key in [
-                    'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best',
-                    'rule'
-            ]:
-                eval_kwargs.pop(key, None)
-            eval_kwargs.update(dict(metric=args.eval, **kwargs))
-            print(dataset.evaluate(outputs, **eval_kwargs))
+        psnr_lst = []
+        ssim_lst = []
+        next_psnr_lst = []
+        next_ssim_lst = []
+        input_depth_error_lst = []
+        target_depth_error_lst = []
+        for one_output in outputs:
+            psnr_lst.append(one_output['psnr'])
+            ssim_lst.append(one_output['ssim'])
+            if 'next_psnr' in one_output: next_psnr_lst.append(one_output['next_psnr'])
+            if 'next_ssim' in one_output: next_ssim_lst.append(one_output['next_ssim'])
+            if 'input_depth_error' in one_output: input_depth_error_lst.append(one_output['input_depth_error'])
+            if 'target_depth_error' in one_output: target_depth_error_lst.append(one_output['target_depth_error'])
+        print(f'psnr: {sum(psnr_lst) / len(psnr_lst)}') 
+        print(f'ssim: {sum(ssim_lst) / len(ssim_lst)}')
+        if 'next_psnr' in one_output: print(f'next psnr: {sum(next_psnr_lst) / len(next_psnr_lst)}') 
+        if 'next_ssim' in one_output: print(f'next ssim: {sum(next_ssim_lst) / len(next_ssim_lst)}')
+        if 'next_psnr' in one_output: print("input_depth_error_lst: ", np.mean(np.stack(input_depth_error_lst), 0))
+        if 'next_ssim' in one_output: print("target_depth_error_lst: ", np.mean(np.stack(target_depth_error_lst), 0))
+
+
+        if 'target_lidar_abs_rel' in one_output.keys():
+            target_lidar_abs_rel_lst = []
+            target_lidar_sq_rel_lst = []
+            target_lidar_rmse_lst = []
+            target_lidar_rmse_log_lst = []
+            target_lidar_a1_lst = []
+            target_lidar_a2_lst = []
+            target_lidar_a3_lst = []
+
+            input_lidar_abs_rel_lst = []
+            input_lidar_sq_rel_lst = []
+            input_lidar_rmse_lst = []
+            input_lidar_rmse_log_lst = []
+            input_lidar_a1_lst = []
+            input_lidar_a2_lst = []
+            input_lidar_a3_lst = []
+
+            target_emernerf_abs_rel_lst = []
+            target_emernerf_sq_rel_lst = []
+            target_emernerf_rmse_lst = []
+            target_emernerf_rmse_log_lst = []
+            target_emernerf_a1_lst = []
+            target_emernerf_a2_lst = []
+            target_emernerf_a3_lst = []
+
+            input_emernerf_abs_rel_lst = []
+            input_emernerf_sq_rel_lst = []
+            input_emernerf_rmse_lst = []
+            input_emernerf_rmse_log_lst = []
+            input_emernerf_a1_lst = []
+            input_emernerf_a2_lst = []
+            input_emernerf_a3_lst = []
+
+            lidar_emernerf_abs_rel_lst = []
+            lidar_emernerf_sq_rel_lst = []
+            lidar_emernerf_rmse_lst = []
+            lidar_emernerf_rmse_log_lst = []
+            lidar_emernerf_a1_lst = []
+            lidar_emernerf_a2_lst = []
+            lidar_emernerf_a3_lst = []
+            
+            for one_output in outputs:
+                target_lidar_abs_rel_lst.append(one_output['target_lidar_abs_rel'])
+                target_lidar_sq_rel_lst.append(one_output['target_lidar_sq_rel'])
+                target_lidar_rmse_lst.append(one_output['target_lidar_rmse'])
+                target_lidar_rmse_log_lst.append(one_output['target_lidar_rmse_log'])
+                target_lidar_a1_lst.append(one_output['target_lidar_a1'])
+                target_lidar_a2_lst.append(one_output['target_lidar_a2'])
+                target_lidar_a3_lst.append(one_output['target_lidar_a3'])
+
+                input_lidar_abs_rel_lst.append(one_output['input_lidar_abs_rel'])
+                input_lidar_sq_rel_lst.append(one_output['input_lidar_sq_rel'])
+                input_lidar_rmse_lst.append(one_output['input_lidar_rmse'])
+                input_lidar_rmse_log_lst.append(one_output['input_lidar_rmse_log'])
+                input_lidar_a1_lst.append(one_output['input_lidar_a1'])
+                input_lidar_a2_lst.append(one_output['input_lidar_a2'])
+                input_lidar_a3_lst.append(one_output['input_lidar_a3'])
+
+                target_emernerf_abs_rel_lst.append(one_output['target_emernerf_abs_rel'])
+                target_emernerf_sq_rel_lst.append(one_output['target_emernerf_sq_rel'])
+                target_emernerf_rmse_lst.append(one_output['target_emernerf_rmse'])
+                target_emernerf_rmse_log_lst.append(one_output['target_emernerf_rmse_log'])
+                target_emernerf_a1_lst.append(one_output['target_emernerf_a1'])
+                target_emernerf_a2_lst.append(one_output['target_emernerf_a2'])
+                target_emernerf_a3_lst.append(one_output['target_emernerf_a3'])
+
+                input_emernerf_abs_rel_lst.append(one_output['input_emernerf_abs_rel'])
+                input_emernerf_sq_rel_lst.append(one_output['input_emernerf_sq_rel'])
+                input_emernerf_rmse_lst.append(one_output['input_emernerf_rmse'])
+                input_emernerf_rmse_log_lst.append(one_output['input_emernerf_rmse_log'])
+                input_emernerf_a1_lst.append(one_output['input_emernerf_a1'])
+                input_emernerf_a2_lst.append(one_output['input_emernerf_a2'])
+                input_emernerf_a3_lst.append(one_output['input_emernerf_a3'])
+
+                lidar_emernerf_abs_rel_lst.append(one_output['lidar_emernerf_abs_rel'])
+                lidar_emernerf_sq_rel_lst.append(one_output['lidar_emernerf_sq_rel'])
+                lidar_emernerf_rmse_lst.append(one_output['lidar_emernerf_rmse'])
+                lidar_emernerf_rmse_log_lst.append(one_output['lidar_emernerf_rmse_log'])
+                lidar_emernerf_a1_lst.append(one_output['lidar_emernerf_a1'])
+                lidar_emernerf_a2_lst.append(one_output['lidar_emernerf_a2'])
+                lidar_emernerf_a3_lst.append(one_output['lidar_emernerf_a3'])
+
+            print(f'target_lidar_abs_rel_lst: {sum(target_lidar_abs_rel_lst) / len(target_lidar_abs_rel_lst)}') 
+            print(f'target_lidar_sq_rel_lst: {sum(target_lidar_sq_rel_lst) / len(target_lidar_sq_rel_lst)}') 
+            print(f'target_lidar_rmse_lst: {sum(target_lidar_rmse_lst) / len(target_lidar_rmse_lst)}') 
+            print(f'target_lidar_rmse_log_lst: {sum(target_lidar_rmse_log_lst) / len(target_lidar_rmse_log_lst)}') 
+            print(f'target_lidar_a1_lst: {sum(target_lidar_a1_lst) / len(target_lidar_a1_lst)}') 
+            print(f'target_lidar_a2_lst: {sum(target_lidar_a2_lst) / len(target_lidar_a2_lst)}') 
+            print(f'target_lidar_a3_lst: {sum(target_lidar_a3_lst) / len(target_lidar_a3_lst)}') 
+
+            print()
+            print(f'input_lidar_abs_rel_lst: {sum(input_lidar_abs_rel_lst) / len(input_lidar_abs_rel_lst)}') 
+            print(f'input_lidar_sq_rel_lst: {sum(input_lidar_sq_rel_lst) / len(input_lidar_sq_rel_lst)}') 
+            print(f'input_lidar_rmse_lst: {sum(input_lidar_rmse_lst) / len(input_lidar_rmse_lst)}') 
+            print(f'input_lidar_rmse_log_lst: {sum(input_lidar_rmse_log_lst) / len(input_lidar_rmse_log_lst)}') 
+            print(f'input_lidar_a1_lst: {sum(input_lidar_a1_lst) / len(input_lidar_a1_lst)}') 
+            print(f'input_lidar_a2_lst: {sum(input_lidar_a2_lst) / len(input_lidar_a2_lst)}') 
+            print(f'input_lidar_a3_lst: {sum(input_lidar_a3_lst) / len(input_lidar_a3_lst)}') 
+
+            print()
+            print(f'target_emernerf_abs_rel_lst: {sum(target_emernerf_abs_rel_lst) / len(target_emernerf_abs_rel_lst)}')
+            print(f'target_emernerf_sq_rel_lst: {sum(target_emernerf_sq_rel_lst) / len(target_emernerf_sq_rel_lst)}')
+            print(f'target_emernerf_rmse_lst: {sum(target_emernerf_rmse_lst) / len(target_emernerf_rmse_lst)}')
+            print(f'target_emernerf_rmse_log_lst: {sum(target_emernerf_rmse_log_lst) / len(target_emernerf_rmse_log_lst)}')
+            print(f'target_emernerf_a1_lst: {sum(target_emernerf_a1_lst) / len(target_emernerf_a1_lst)}')
+            print(f'target_emernerf_a2_lst: {sum(target_emernerf_a2_lst) / len(target_emernerf_a2_lst)}')
+            print(f'target_emernerf_a3_lst: {sum(target_emernerf_a3_lst) / len(target_emernerf_a3_lst)}')
+
+            print()
+            print(f'input_emernerf_abs_rel_lst: {sum(input_emernerf_abs_rel_lst) / len(input_emernerf_abs_rel_lst)}')
+            print(f'input_emernerf_sq_rel_lst: {sum(input_emernerf_sq_rel_lst) / len(input_emernerf_sq_rel_lst)}')
+            print(f'input_emernerf_rmse_lst: {sum(input_emernerf_rmse_lst) / len(input_emernerf_rmse_lst)}')
+            print(f'input_emernerf_rmse_log_lst: {sum(input_emernerf_rmse_log_lst) / len(input_emernerf_rmse_log_lst)}')
+            print(f'input_emernerf_a1_lst: {sum(input_emernerf_a1_lst) / len(input_emernerf_a1_lst)}')
+            print(f'input_emernerf_a2_lst: {sum(input_emernerf_a2_lst) / len(input_emernerf_a2_lst)}')
+            print(f'input_emernerf_a3_lst: {sum(input_emernerf_a3_lst) / len(input_emernerf_a3_lst)}')
+
+
+            print()
+            print(f'lidar_emernerf_abs_rel_lst: {sum(lidar_emernerf_abs_rel_lst) / len(lidar_emernerf_abs_rel_lst)}')
+            print(f'lidar_emernerf_sq_rel_lst: {sum(lidar_emernerf_sq_rel_lst) / len(lidar_emernerf_sq_rel_lst)}')
+            print(f'lidar_emernerf_rmse_lst: {sum(lidar_emernerf_rmse_lst) / len(lidar_emernerf_rmse_lst)}')
+            print(f'lidar_emernerf_rmse_log_lst: {sum(lidar_emernerf_rmse_log_lst) / len(lidar_emernerf_rmse_log_lst)}')
+            print(f'lidar_emernerf_a1_lst: {sum(lidar_emernerf_a1_lst) / len(lidar_emernerf_a1_lst)}')
+            print(f'lidar_emernerf_a2_lst: {sum(lidar_emernerf_a2_lst) / len(lidar_emernerf_a2_lst)}')
+            print(f'lidar_emernerf_a3_lst: {sum(lidar_emernerf_a3_lst) / len(lidar_emernerf_a3_lst)}')
+            
+        import pdb; pdb.set_trace()
+        # if args.eval:
+        #     eval_kwargs = cfg.get('evaluation', {}).copy()
+        #     # hard-code way to remove EvalHook args
+        #     for key in [
+        #             'interval', 'tmpdir', 'start', 'gpu_collect', 'save_best',
+        #             'rule'
+        #     ]:
+        #         eval_kwargs.pop(key, None)
+        #     eval_kwargs.update(dict(metric=args.eval, **kwargs))
+        #     print(dataset.evaluate(outputs, **eval_kwargs))
 
 
 if __name__ == '__main__':

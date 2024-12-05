@@ -19,7 +19,7 @@ This project implements a dummy ResNet wrapper, which literally does nothing new
 In MMDet3D's root directory, run the following command to train the model:
 
 ```bash
-python tools/train.py projects/example_project/configs/fcos3d_dummy-resnet-caffe-dcn_fpn_head-gn_8xb2-1x_nus-mono3d.py
+python tools/train.py projects/example_projects/DistillNeRF/configs/fcos3d_dummy-resnet-caffe-dcn_fpn_head-gn_8xb2-1x_nus-mono3d.py
 ```
 
 ### Testing commands
@@ -27,7 +27,7 @@ python tools/train.py projects/example_project/configs/fcos3d_dummy-resnet-caffe
 In MMDet3D's root directory, run the following command to test the model:
 
 ```bash
-python tools/test.py projects/example_project/configs/fcos3d_dummy-resnet-caffe-dcn_fpn_head-gn_8xb2-1x_nus-mono3d.py ${CHECKPOINT_PATH}
+python tools/test.py projects/example_projects/DistillNeRF/configs/fcos3d_dummy-resnet-caffe-dcn_fpn_head-gn_8xb2-1x_nus-mono3d.py ${CHECKPOINT_PATH}
 ```
 
 ## Results
@@ -37,7 +37,7 @@ python tools/test.py projects/example_project/configs/fcos3d_dummy-resnet-caffe-
 
 |                                                     Backbone                                                     | Lr schd | Mem (GB) | Inf time (fps) | mAP  | NDS  |         Download         |
 | :--------------------------------------------------------------------------------------------------------------: | :-----: | :------: | :------------: | :--: | :--: | :----------------------: |
-| [FCOS3D_dummy](projects/example_project/configs/fcos3d_dummy-resnet-caffe-dcn_fpn_head-gn_8xb2-1x_nus-mono3d.py) |   1x    |   8.69   |                | 29.8 | 37.7 | [model](<>) \| [log](<>) |
+| [FCOS3D_dummy](projects/example_projects/DistillNeRF/configs/fcos3d_dummy-resnet-caffe-dcn_fpn_head-gn_8xb2-1x_nus-mono3d.py) |   1x    |   8.69   |                | 29.8 | 37.7 | [model](<>) \| [log](<>) |
 
 ## Citation
 

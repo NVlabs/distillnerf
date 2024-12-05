@@ -1,0 +1,26 @@
+numpy==1.23.5 # Need this version for numba==0.53.0 compatibility.
+tqdm==4.65.2
+numba==0.53.0
+# lyft-dataset-sdk
+# waymo-open-dataset-tf-2-6-0
+matplotlib
+pandas
+seaborn
+
+
+torch==1.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+
+
+# torchvision==0.14.1+cu116
+# pip install torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+
+lpips
+efficientnet_pytorch
+einops
+wandb
+
+# Development
+black
+isort
+pytest
+pytest-xdist

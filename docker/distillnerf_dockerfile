@@ -1,0 +1,75 @@
+# FROM python:3.8
+# FROM pytorch/pytorch:1.13.1-cuda11.6-cudnn8-devel
+FROM nvidia/cuda:11.6.1-devel-ubuntu20.04
+RUN apt-get update
+RUN apt-get install -y python3.8 python3-pip
+RUN ln -s /bin/python3.8 /bin/python
+RUN apt-get install -y git
+
+# Copy the DistillNeRF directory contents into the container's /usr/src/DistillNeRF directory
+COPY ./DistillNeRF /usr/src/DistillNeRF
+
+# Set the working directory to /usr/src/DistillNeRF
+WORKDIR /usr/src/DistillNeRF
+
+# List the contents of the directory (for debugging, optional)
+RUN ls
+
+RUN pip install torch==1.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+
+# Run the setup script
+RUN chmod +x setup.sh && ./setup.sh
+
+# Set the PYTHONPATH to the current working directory
+ENV PYTHONPATH=/usr/src/DistillNeRF
+
+RUN pip install torch==1.13.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+RUN pip install torchvision==0.14.1+cu116 --extra-index-url https://download.pytorch.org/whl/cu116
+
+
+
+
+# sudo docker build --progress=plain -f DistillNeRF/docker/distillnerf_dockerfile -t letianw/distillnerf .
+# sudo docker build --progress=plain -f DistillNeRF/docker/distillnerf_dockerfile -t letianw/distillnerf2 .
+# sudo docker build --progress=plain -f DistillNeRF/docker/distillnerf_dockerfile -t letianw/distillnerf3 .
+# sudo docker build --progress=plain -f DistillNeRF/docker/distillnerf_dockerfile -t letianw/distillnerf4 .
+# sudo docker build --progress=plain -f DistillNeRF/docker/distillnerf_dockerfile -t letianw/distillnerf5 .
+
+
+
+
+# sudo DOCKER_BUILDKIT=1 docker build --gpus all --progress=plain -f DistillNeRF/docker/distillnerf_dockerfile -t letianw/distillnerf2 .
+
+
+
+
+# sudo docker run -v /home/letian/data:/data -v /home/letian/DistillNeRF_0612/DistillNeRF_0612/:/distillnerf_back/ -it letianw/distillnerf sh
+# sudo docker run -v /home/letian/data:/data -v /home/letian/DistillNeRF_0612/DistillNeRF_0612/:/distillnerf_back/ -it letianw/distillnerf2 sh
+# sudo docker run --gpus all -v /home/letian/data:/data -v /home/letian/DistillNeRF_0612/DistillNeRF_0612/:/distillnerf_back/ -it letianw/distillnerf4 sh
+# sudo docker run --gpus all -v /home/letian/data:/data -v /home/letian/DistillNeRF_0612/DistillNeRF_0612/:/distillnerf_back/ -it letianw/distillnerf5 sh
+
+
+# cd data
+# rm nuscenes
+# rm nuscenes_full
+# rm nuscenes_processed
+# rm waymo
+# ln -s /data/v1.0-trainval nuscenes
+# ln -s /data/v1.0-trainval nuscenes_full
+# ln -s /data/nuscenes_processed nuscenes_processed
+# ln -s /data/waymo waymo
+# # 
+# cd ..
+# rm aux_models
+# rm checkpoint
+# rm tempt_file
+# ln -s /distillnerf_back/aux_models aux_models
+# ln -s /distillnerf_back/checkpoint checkpoint
+# ln -s /distillnerf_back/tempt_file tempt_file
+
+
+
+# sudo docker run -v /home/letian/DistillNeRF_0612/DistillNeRF/:/distillnerf_back/ -it python:3.8 sh
+
+
+# pytorch/pytorch:1.13.1-cuda11.7-cudnn8-devel

@@ -1,0 +1,203 @@
+# ''' image/rendering size '''
+# Change accordingly in the dataset config (desired_input_img_size, volume_render_downscale_factor)
+input_img_width: 400
+input_img_height: 224
+render_width: 200
+render_height: 112
+
+
+# ''' feature dim '''
+# 1. fpn depth feature hidden/output dim, 2. depth anything combiner output dim, 3. depthnet input dim
+depth_feature_dim: 64
+# depth_feature_dim + 1 density dim
+feature_size: 65      
+# depth_feature_dim / 2 + 1, this determines the dimension of octree features
+octree_final_dim: 33   
+
+
+# ''' rendering '''
+density_activation: exp             # exp, sigmoid, softplus
+density_clamp_val: 30
+
+
+# ''' octree'
+octree_levels:
+  - 7
+  - 9
+
+
+# ''' depth '''
+encoder_depth_expand_num_samples: 15
+geom_param:
+  sample_method: 'uniform_lindisp'  # uniform_lindisp, uniform
+  # only used for uniform
+  xbound:
+    - -50.0
+    - 50.0
+    - 0.15
+  ybound:
+    - -50.0
+    - 50.0
+    - 0.15
+  zbound:
+    - -5.0
+    - 15.0
+    - 0.15
+  dbound:
+    - 0.25
+    - 50.0
+    - 0.4
+  downsample: 1
+  # only used for uniform_lindisp
+  inner_range: 50                   
+  xy_inner_range: ${geom_param.inner_range} 
+  z_inner_range: 6.4
+  contract_ratio: 0.8
+  near_plane_in_x: 0.1
+  far_plane_in_x: 120
+  inner_step_in_x: 0.2
+  outer_sample_in_s_aug: 1
+  lidar_range: 80                           # for lidar depth clip, Change accordingly in the dataset config (point_cloud_range)
+  sky_depth: ${geom_param.far_plane_in_x}   # fixed the depth of sky
+  max_depth: ${geom_param.far_plane_in_x}   # for depth supervision clamp
+  min_depth: 0.00001                        # for depth supervision clamp
+
+
+model:
+  _target_: projects.DistillNeRF.models.distillnerf_model.DistillNerfModel
+  _recursive_: false
+  config:
+    mono_depth_pretained_model: ${mono_depth_pretained_model}
+    coarse_mono_depth_estimator: ${coarse_mono_depth_estimator}
+    fine_mono_depth_estimator: ${fine_mono_depth_estimator}
+    multi_view_pooling_octree_encoder: ${multi_view_pooling_octree_encoder}
+    decoder: ${decoder}
+    projector: ${projector}
+    # for geometry
+    geom_param: ${geom_param}
+    render_img_height: ${render_height}            # render pixel height num - dec frustum
+    render_img_width: ${render_width}             # render pixel width num - dec frustum
+    render_img_depth: ${geom_param.dbound}        # render depth - dec frustum
+    input_img_width: ${input_img_width}            # rendering image width
+    input_img_height: ${input_img_height}           # rendering image height
+    downsample: ${geom_param.downsample}
+
+
+mono_depth_pretained_model:
+  _target_: projects.DistillNeRF.modules.depthanything.depth_anything_wrapper.DepthAnythingExtractor
+  config:
+    model_path: ./aux_models/depth_anything_vitb
+
+
+coarse_mono_depth_estimator:
+  _target_: projects.DistillNeRF.modules.coarse_depth_estimator_fpn.CoarseDepthEstimatorFPN
+  _recursive_: false
+  config:
+    input_dim_width: ${input_img_width}                   # reshape input image and output depth image
+    input_dim_height: ${input_img_height}                 # reshape input image and output depth image
+    density_activation: ${density_activation}             # exp, sigmoid, softplus
+    geom_param: ${geom_param}
+    # fpn parameters
+    downsample: 1
+    fpn_blocks:
+      - 2
+      - 3
+      - 5
+      - 5
+    # 1. fpn depth feature hidden/output dim, 2. depth anything combiner output dim, 3. depthnet input dim
+    depth_feature_dim: ${depth_feature_dim} # dimension of fpn depth feature, used all the way
+    depth_feature_combiner:
+      _target_: projects.DistillNeRF.modules.depthanything.depth_anything_wrapper.DepthAnythingCombiner
+      config:
+        depthanything_feat_chan: 128
+        model_hidden_channels: 128
+        num_blocks: 2
+        depth_feat_multiplier: 1.0
+    density_softclamp: True
+    density_clamp_val: ${density_clamp_val}
+
+
+fine_mono_depth_estimator:
+  _target_: projects.DistillNeRF.modules.fine_depth_estimator_fpn.FineDepthEstimatorFPN
+  _recursive_: false
+  config:
+    num_depth_candidate_samples: ${encoder_depth_expand_num_samples}
+    sample_eps_ratio: 0.025
+    density_activation: ${density_activation}             # exp, sigmoid, softplus
+    depth_feature_dim: ${depth_feature_dim}
+    candidate_depth_feature_combine: multiply
+    downsample: ${geom_param.downsample}
+    density_clamp_val: ${density_clamp_val}
+    feature_size: ${feature_size}
+    # fpn parameters
+    fpn_middle_channels: 16
+    fpn_final_channels: 16
+    fpn_blocks:
+      - 2
+      - 3
+      - 5
+      - 5
+
+
+multi_view_pooling_octree_encoder:
+  _target_: projects.DistillNeRF.models.multi_view_pooling_octree_encoder.MultViewPoolingOctreeEncoder
+  _recursive_: false
+  config:
+    max_pool_feats: false
+    feature_size: ${feature_size}
+    downsample: ${geom_param.downsample}
+    geom_param: ${geom_param}
+    octree_levels: ${octree_levels}
+    density_clamp_val: ${density_clamp_val}
+    store_spc: false
+    sparse_voxel_convnet:
+      _target_: projects.DistillNeRF.modules.sparse_voxel_convnet.SparseVoxelTopDownConvNet
+      config:
+        num_layers: 2
+        octree_final_dim: ${octree_final_dim}
+        feature_size: ${feature_size}
+        octree_levels: ${octree_levels}
+        model_hidden_dim: 128   # middle hidden channels
+
+
+projector:
+  _target_: projects.DistillNeRF.models.nerf_projector.NerfProjector
+  _recursive_: false
+  config:
+    render_img_height: ${render_height}        # render height
+    render_img_width: ${render_width}         # render width
+    render_img_depth: ${model.config.render_img_depth}  # used to create frustm
+    render_ray_batch_num: 16                # divide rays to constrain memory
+    fine_depth_interval: 0.1        # fine depth samples interval
+    fine_depth_resolution: 30       # number of fine depth samples
+    geom_param: ${geom_param}
+    density_activation: ${density_activation}             # exp, sigmoid, softplus
+    volume_renderer:
+      _target_: projects.DistillNeRF.modules.octree_renderer.OctreeImportanceRenderer
+      config:
+        stochastic_render_sample: ${stochastic_render_sample}             # coarse depth sampling stochasticity
+        geom_param: ${geom_param}
+        density_clamp_val: ${density_clamp_val}
+        render_clamp_val: 10
+        max_depth: ${geom_param.max_depth}
+        seperate_feat_density_clamp: False
+        octree_levels: ${multi_view_pooling_octree_encoder.config.octree_levels}
+        num_density_levels: 2
+        sparse_sample_ratio: 2
+        embed_rendered_feat: False
+        feature_size: ${feature_size}
+        nerf_hidden_dim: 128
+        num_nerf_layer: 3
+stochastic_render_sample: True
+
+
+decoder:
+  _target_: projects.DistillNeRF.models.conv_decoder.ConvDecoder
+  _recursive_: false
+  config:
+    num_gen_layers: 4
+    num_to_upsample: 1
+    dec_channel_multiplier: 0.3
+    feature_size: ${feature_size}
+    num_classes: 3
+    padding_mode: zeros

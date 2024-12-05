@@ -22,6 +22,12 @@ from mmdet3d.utils import collect_env, get_root_logger
 from mmdet.apis import set_random_seed
 from mmseg import __version__ as mmseg_version
 
+import os
+# os.environ["WANDB_API_KEY"] = 'f27c8a3adbf54ec8eb223ffbbda01f1d726a0b88'
+os.environ["WANDB_MODE"] = "online"
+
+
+
 try:
     # If mmdet version > 2.20.0, setup_multi_processes would be imported and
     # used from mmdet instead of mmdet3d.
@@ -119,6 +125,13 @@ def main():
     cfg = Config.fromfile(args.config)
     if args.cfg_options is not None:
         cfg.merge_from_dict(args.cfg_options)
+    if args.cfg_options is not None:
+        if "log_config.hooks[1].init_kwargs.name" in args.cfg_options:  
+            cfg.log_config.hooks[1].init_kwargs.name = args.cfg_options["log_config.hooks[1].init_kwargs.name"]
+        if "log_config.hooks[1].init_kwargs.id" in args.cfg_options:
+            cfg.log_config.hooks[1].init_kwargs.id = args.cfg_options["log_config.hooks[1].init_kwargs.id"]
+        if "log_config.hooks[1].init_kwargs.resume" in args.cfg_options:
+            cfg.log_config.hooks[1].init_kwargs.resume = args.cfg_options["log_config.hooks[1].init_kwargs.resume"]
 
     # set multi-process settings
     setup_multi_processes(cfg)
@@ -126,6 +139,9 @@ def main():
     # set cudnn_benchmark
     if cfg.get('cudnn_benchmark', False):
         torch.backends.cudnn.benchmark = True
+
+    torch.set_float32_matmul_precision('high')
+    torch.backends.cuda.matmul.allow_tf32=False
 
     # work_dir is determined in this priority: CLI > segment in file > filename
     if args.work_dir is not None:
@@ -160,7 +176,6 @@ def main():
         cfg.gpu_ids = [args.gpu_id]
 
     if args.autoscale_lr:
-        # apply the linear scaling rule (https://arxiv.org/abs/1706.02677)
         cfg.optimizer['lr'] = cfg.optimizer['lr'] * len(cfg.gpu_ids) / 8
 
     # init distributed env first, since logger depends on the dist info.
@@ -182,47 +197,40 @@ def main():
     log_file = osp.join(cfg.work_dir, f'{timestamp}.log')
     # specify logger name, if we still use 'mmdet', the output info will be
     # filtered and won't be saved in the log_file
-    # TODO: ugly workaround to judge whether we are training det or seg model
-    if cfg.model.type in ['EncoderDecoder3D']:
-        logger_name = 'mmseg'
-    else:
-        logger_name = 'mmdet'
+    logger_name = 'mmdet'
     logger = get_root_logger(
         log_file=log_file, log_level=cfg.log_level, name=logger_name)
 
     # init the meta dict to record some important information such as
-    # environment info and seed, which will be logged
+    # environment
+    #  info and seed, which will be logged
     meta = dict()
     # log env info
     env_info_dict = collect_env()
     env_info = '\n'.join([(f'{k}: {v}') for k, v in env_info_dict.items()])
     dash_line = '-' * 60 + '\n'
-    logger.info('Environment info:\n' + dash_line + env_info + '\n' +
-                dash_line)
     meta['env_info'] = env_info
     meta['config'] = cfg.pretty_text
 
     # log some basic info
     logger.info(f'Distributed training: {distributed}')
-    logger.info(f'Config:\n{cfg.pretty_text}')
 
     # set random seeds
     seed = init_random_seed(args.seed)
     seed = seed + dist.get_rank() if args.diff_seed else seed
-    logger.info(f'Set random seed to {seed}, '
-                f'deterministic: {args.deterministic}')
+    # logger.info(f'Set random seed to {seed}, '
+    #             f'deterministic: {args.deterministic}')
     set_random_seed(seed, deterministic=args.deterministic)
     cfg.seed = seed
     meta['seed'] = seed
     meta['exp_name'] = osp.basename(args.config)
-
     model = build_model(
         cfg.model,
         train_cfg=cfg.get('train_cfg'),
         test_cfg=cfg.get('test_cfg'))
     model.init_weights()
 
-    logger.info(f'Model:\n{model}')
+    # logger.info(f'Model:\n{model}')
     datasets = [build_dataset(cfg.data.train)]
     if len(cfg.workflow) == 2:
         val_dataset = copy.deepcopy(cfg.data.val)
@@ -231,9 +239,6 @@ def main():
             val_dataset.pipeline = cfg.data.train.dataset.pipeline
         else:
             val_dataset.pipeline = cfg.data.train.pipeline
-        # set test_mode=False here in deep copied config
-        # which do not affect AP/AR calculation later
-        # refer to https://mmdetection3d.readthedocs.io/en/latest/tutorials/customize_runtime.html#customize-workflow  # noqa
         val_dataset.test_mode = False
         datasets.append(build_dataset(val_dataset))
     if cfg.checkpoint_config is not None:
@@ -249,6 +254,7 @@ def main():
             if hasattr(datasets[0], 'PALETTE') else None)
     # add an attribute for visualization convenience
     model.CLASSES = datasets[0].CLASSES
+
     train_model(
         model,
         datasets,

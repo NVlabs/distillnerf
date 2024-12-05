@@ -1,6 +1,11 @@
 # Copyright (c) OpenMMLab. All rights reserved.
 import mmcv
 import numpy as np
+import torch
+import os
+import pickle
+from typing import Dict, Any
+from mmcv.parallel import DataContainer as DC
 
 from mmdet3d.core.points import BasePoints, get_points_type
 from mmdet.datasets.pipelines import LoadAnnotations, LoadImageFromFile
@@ -208,6 +213,7 @@ class LoadPointsFromMultiSweeps(object):
         points.tensor[:, self.time_dim] = 0
         sweep_points_list = [points]
         ts = results['timestamp']
+        # import pdb; pdb.set_trace()
         if self.pad_empty_sweeps and len(results['sweeps']) == 0:
             for i in range(self.sweeps_num):
                 if self.remove_close:
@@ -244,6 +250,181 @@ class LoadPointsFromMultiSweeps(object):
     def __repr__(self):
         """str: Return a string that describes the module."""
         return f'{self.__class__.__name__}(sweeps_num={self.sweeps_num})'
+
+@PIPELINES.register_module()
+class LoadVoxelFromFilesInCeph(object):
+    """Load pre-trained voxel data from a list of separate channel files.
+
+    Expects results['img_filename'] to be a list of filenames.
+
+    Args:
+        color_type (str): Color type of the file. Defaults to 'unchanged'.
+    """
+
+    def __init__(self, file_client_args=dict(backend='disk'), root='', skip_missing=False, sparse=True, variant_name='DINO_VOXEL_V1_200_200_16'):
+        self.variant_name = variant_name
+        self.file_client_args = file_client_args.copy()
+        self.file_client = mmcv.FileClient(**self.file_client_args)
+        self.root = root
+        self.skip_missing = skip_missing
+        self.sparse = sparse
+
+        # TODO(pkarkus) hack to run on NGC and locally without chenging config
+        if self.root != "" and not os.path.exists(self.root):
+            print (f"Root {root} does not exists.")
+            self.root = ""
+
+    def __call__(self, results):
+        """Call function to load multi-view image from files.
+
+        Args:
+            results (dict): Result dict containing multi-view image filenames.
+
+        Returns:
+            dict: The result dict containing the multi-view image data. \
+                Added keys and values are described below.
+
+                - filename (list of str): Multi-view image filenames.
+                - img (np.ndarray): Multi-view image arrays.
+                - img_shape (tuple[int]): Shape of multi-view image arrays.
+                - ori_shape (tuple[int]): Shape of original image arrays.
+                - pad_shape (tuple[int]): Shape of padded image arrays.
+                - scale_factor (float): Scale factor.
+                - img_norm_cfg (dict): Normalization configuration of images.
+        """
+        # lidar_path = [filename for filename in results['img_filename'] if "LIDAR_TOP" in filename]
+        # assert len(lidar_path) == 1, f"Could not find LIDAR_TOP image path in {results['img_filename']}"
+        # lidar_path = lidar_path[0]
+        lidar_path = results["pts_filename"]
+
+        # voxel_filename = lidar_path.replace("samples/LIDAR_TOP", f"samples_voxel/{self.variant_name}")
+        voxel_filename = lidar_path.replace("nuscenes/samples/LIDAR_TOP", f"nuscenes2/samples_voxel/{self.variant_name}")
+        voxel_filename = voxel_filename.replace("__LIDAR_TOP__", "__VOXEL__")
+        # Pickle format
+        voxel_filename = voxel_filename.replace(".pcd.bin", ".pkl")
+        voxel_filepath = os.path.join(self.root, voxel_filename)
+
+        # print (f"Checking file {voxel_filepath}. Root {self.root}")
+
+        print(voxel_filepath)
+        # import pdb; pdb.set_trace()
+        if self.skip_missing and not os.path.exists(voxel_filepath):
+            # print (f"skipping file {voxel_filename}. Scene={results['scene_token']}")
+            voxel_filepath = os.path.join(os.path.dirname(voxel_filepath), "n008-2018-08-01-15-16-36-0400__VOXEL__1533151606048630.pkl")
+            # voxel_filepath = os.path.join(os.path.dirname(voxel_filepath), "n008-2018-08-01-15-16-36-0400__VOXEL__1533151603547590.pkl")
+            # voxel_filepath = os.path.join(os.path.dirname(voxel_filepath), "n008-2018-08-22-15-53-49-0400__VOXEL__1534968262397389.pkl")
+            # voxel_filepath = os.path.join(os.path.dirname(voxel_filepath), "n015-2018-08-01-16-41-59+0800__VOXEL__1533113051197006.pkl")
+            print("---------------------os.path.exists(voxel_filepath): ", os.path.exists(voxel_filepath))
+            if not os.path.exists(voxel_filepath):
+                voxel_filepath = os.path.join(os.path.dirname(voxel_filepath), "n015-2018-07-24-11-03-52+0800__VOXEL__1532401620448248.pkl")
+        # else:
+        #     print (f"File exists {voxel_filepath}. Root {self.root}")
+        # import pdb; pdb.set_trace()
+        if self.file_client_args['backend'] == 'petrel':
+            img_bytes = self.file_client.get(voxel_filepath)
+            feat_dict: Dict[str, Any] = pickle.loads(img_bytes)
+        elif self.file_client_args['backend'] == 'disk':
+            feat_dict: Dict[str, Any] = pickle.loads(self.file_client.get(voxel_filepath))
+
+        # "static_feats": static_feats.numpy(),
+        # "static_occupied_inds": static_occupied_inds.numpy(),
+        # "static_densities": static_densities.numpy(),
+        # "dynamic_feats": dynamic_feats.numpy(),
+        # "dynamic_occupied_inds": dynamic_occupied_inds.numpy(),
+        # "dynamic_densities": dynamic_densities.numpy(),
+        # "ego_pose": ego_pose,
+        # "voxel_shape": voxel_shape,
+        # import pdb; pdb.set_trace()
+
+        # Reconstruct sparse voxel features into dense array
+        voxel_shape = feat_dict.get("voxel_shape", (200, 200, 16, feat_dict["static_feats"].shape[-1]))
+        # import pdb; pdb.set_trace()
+
+        if feat_dict["static_densities"].ndim == 1:
+            feat_dict["static_densities"] = feat_dict["static_densities"][:, None]
+        feat_dict["dynamic_densities"] = [
+            (x[:, None] if x.ndim == 1 else x) 
+            for x in feat_dict["dynamic_densities"]
+        ]
+
+        if self.sparse:
+            # results['static_voxel_feats'] = feat_dict["static_feats"]  # nse, f
+            # results['static_voxel_inds'] = feat_dict["static_occupied_inds"]  # nse, 3
+            # results['dynamic_voxel_feats'] = feat_dict["dynamic_feats"]  # T, [nse, f]
+            # results['dynamic_voxel_inds'] = feat_dict["dynamic_occupied_inds"]  # T, [nse, 3]
+            results['static_voxel'] = DC([
+                torch.from_numpy(feat_dict["static_feats"]), 
+                torch.from_numpy(feat_dict["static_occupied_inds"]),
+            ], stack=False)  # [nse, f], [nse, 3]
+
+            results['static_densities'] = DC([
+                # torch.from_numpy(feat_dict["static_densities"][:, None]), 
+                torch.from_numpy(feat_dict["static_densities"]), 
+                torch.from_numpy(feat_dict["static_occupied_inds"]),
+            ], stack=False)  # [nse, f], [nse, 3]
+
+            num_timesteps = len(feat_dict["dynamic_feats"])
+            # TODO (pkarkus) hardcode 2 steps. We should set min timesteps, drop input with less.
+            assert num_timesteps <= 2
+            if num_timesteps == 1:
+                feats = feat_dict["dynamic_feats"][0]
+                inds = feat_dict["dynamic_occupied_inds"][0]
+                densities = feat_dict["dynamic_densities"][0]
+                feat_dict["dynamic_feats"] = [np.zeros([0, feats.shape[1]], dtype=feats.dtype), feats]
+                feat_dict["dynamic_occupied_inds"] = [np.zeros([0, inds.shape[1]], dtype=inds.dtype), inds]
+                # feat_dict["dynamic_densities"] = [np.zeros([0,], dtype=densities.dtype), densities]
+                feat_dict["dynamic_densities"] = [np.zeros([0, densities.shape[1]], dtype=densities.dtype), densities]
+
+                
+            results['dynamic_voxel'] = DC([
+                [torch.from_numpy(t) for t in feat_dict["dynamic_feats"]],
+                [torch.from_numpy(t) for t in feat_dict["dynamic_occupied_inds"]],
+            ], stack=False)  # [T, [nse, f]], [T, [nse, 3]]
+
+            results['dynamic_densities'] = DC([
+                # [torch.from_numpy(t[:, None]) for t in feat_dict["dynamic_densities"]],
+                [torch.from_numpy(t) for t in feat_dict["dynamic_densities"]],
+                [torch.from_numpy(t) for t in feat_dict["dynamic_occupied_inds"]],
+            ], stack=False)  # [T, [nse, f]], [T, [nse, 3]]
+
+
+        else:
+            static_voxel = np.zeros(voxel_shape, dtype=np.float32)
+            static_voxel[feat_dict["static_occupied_inds"][:, 0], feat_dict["static_occupied_inds"][:, 1], feat_dict["static_occupied_inds"][:, 2]] = feat_dict["static_feats"]
+            num_timesteps = len(feat_dict["dynamic_feats"])
+            dynamic_voxel = np.zeros([num_timesteps] + list(voxel_shape), dtype=np.float32)
+            for t in range(num_timesteps):
+                inds = feat_dict["dynamic_occupied_inds"][t].astype(np.int64)
+                if inds.shape[0] > 0:
+                    dynamic_voxel[t][inds[:, 0], inds[:, 1], inds[:, 2]] = feat_dict["dynamic_feats"][t]
+
+            # TODO (pkarkus) hardcode 2 steps. We should set min timesteps, drop input with less.
+            if num_timesteps == 1:
+                dynamic_voxel = np.concatenate([np.zeros_like(dynamic_voxel), dynamic_voxel], axis=0)
+            else:
+                dynamic_voxel = dynamic_voxel[:2]
+            # unravel to list, see `DefaultFormatBundle` in formating.py
+            # which will transpose each image separately and then stack into array
+            results['static_voxel'] = static_voxel  # h, w, z, f
+            results['dynamic_voxel'] = dynamic_voxel  # t, h, w, z, f
+            results['static_densities'] = None  # not yet supported
+            results['dynamic_densities'] = None  # not yet supported
+        # import pdb; pdb.set_trace()
+        
+        results['voxel_shape'] = DC(voxel_shape, cpu_only=True)
+        results['voxel_filename'] = DC(voxel_filename, cpu_only=True)
+        results['dynamic_voxel_timestamps'] = DC(feat_dict["timestamps"], cpu_only=True)
+
+        # import pdb; pdb.set_trace()
+        del feat_dict
+
+        return results
+
+    def __repr__(self):
+        """str: Return a string that describes the module."""
+        repr_str = self.__class__.__name__
+        repr_str += f"variant_name='{self.variant_name}')"
+        return repr_str
 
 
 @PIPELINES.register_module()

@@ -170,7 +170,8 @@ def waymo_data_prep(root_path,
     """
     from tools.data_converter import waymo_converter as waymo
 
-    splits = ['training', 'validation', 'testing']
+    # splits = ['training', 'validation', 'testing']
+    splits = ["emernerf_notr"]
     for i, split in enumerate(splits):
         load_dir = osp.join(root_path, 'waymo_format', split)
         if split == 'validation':

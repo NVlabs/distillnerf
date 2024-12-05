@@ -84,7 +84,7 @@ class _NumPointsInGTCalculater:
             v_path, dtype=np.float32,
             count=-1).reshape([-1, self.num_features])
         rect = calib['R0_rect']
-        Trv2c = calib['Tr_velo_to_cam']
+        Trv2c = calib['Tr_velo_to_cam_0']
         P2 = calib['P2']
         if self.remove_outside:
             points_v = box_np_ops.remove_outside_points(
@@ -248,9 +248,14 @@ def create_waymo_info_file(data_path,
             to be used. Default: 5.
     """
     imageset_folder = Path(data_path) / 'ImageSets'
-    train_img_ids = _read_imageset_file(str(imageset_folder / 'train.txt'))
-    val_img_ids = _read_imageset_file(str(imageset_folder / 'val.txt'))
-    test_img_ids = _read_imageset_file(str(imageset_folder / 'test.txt'))
+
+    # train_img_ids = _read_imageset_file(str(imageset_folder / 'train.txt'))
+    # val_img_ids = _read_imageset_file(str(imageset_folder / 'val.txt'))
+    # test_img_ids = _read_imageset_file(str(imageset_folder / 'test.txt'))
+
+    train_img_ids = _read_imageset_file(str(imageset_folder / 'notr_frame_idx.txt'))
+    val_img_ids = _read_imageset_file(str(imageset_folder / 'notr_frame_idx.txt'))
+    test_img_ids = _read_imageset_file(str(imageset_folder / 'notr_frame_idx.txt'))
 
     print('Generate info. this may take several minutes.')
     if save_path is None:

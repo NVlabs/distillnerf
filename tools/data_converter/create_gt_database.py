@@ -195,7 +195,8 @@ def create_groundtruth_database(dataset_class_name,
         file_client_args = dict(backend='disk')
         dataset_cfg.update(
             test_mode=False,
-            split='training',
+            # split='training',
+            split='emernerf_notr',
             modality=dict(
                 use_lidar=True,
                 use_depth=False,
@@ -556,7 +557,8 @@ class GTDatabaseCreater:
             file_client_args = dict(backend='disk')
             dataset_cfg.update(
                 test_mode=False,
-                split='training',
+                # split='training',
+                split='emernerf_notr',
                 modality=dict(
                     use_lidar=True,
                     use_depth=False,

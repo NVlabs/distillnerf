@@ -35,7 +35,10 @@ def single_gpu_test(model,
     results = []
     dataset = data_loader.dataset
     prog_bar = mmcv.ProgressBar(len(dataset))
+    sample_num = 0
     for i, data in enumerate(data_loader):
+        sample_num += 1
+        data['is_test'] = True
         with torch.no_grad():
             result = model(return_loss=False, rescale=True, **data)
 
@@ -87,4 +90,9 @@ def single_gpu_test(model,
         batch_size = len(result)
         for _ in range(batch_size):
             prog_bar.update()
+
+        ''' second sample of one scene '''
+        print(sample_num)
+        if sample_num >= 150:
+            break
     return results

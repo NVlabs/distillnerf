@@ -210,7 +210,7 @@ class Waymo2KITTI(object):
             file_idx (int): Current file index.
             frame_idx (int): Current frame index.
         """
-        range_images, camera_projections, range_image_top_pose = \
+        range_images, camera_projections, _, range_image_top_pose = \
             parse_range_image_and_camera_projection(frame)
 
         # First return

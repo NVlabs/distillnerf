@@ -429,6 +429,19 @@ class Custom3DDataset(Dataset):
         Returns:
             dict: Data dictionary of the corresponding index.
         """
+
+        ''' skip the last a few frames: for debugging '''
+        # skip_last_frames = 0    # 7: 5 + 2
+        # if skip_last_frames > 0:
+        #     info = self.data_infos[idx]
+        #     distance_to_end_of_the_scene = 0
+        #     next_token = info['next']
+        #     while next_token != '':
+        #         distance_to_end_of_the_scene += 1
+        #         next_info = self.data_infos[self.token2ids[next_token]]
+        #         next_token = next_info['next']
+        #     idx -= max((skip_last_frames - distance_to_end_of_the_scene), 0)
+
         if self.test_mode:
             return self.prepare_test_data(idx)
         while True:

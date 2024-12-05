@@ -103,11 +103,16 @@ def train_segmentor(model,
         find_unused_parameters = cfg.get('find_unused_parameters', False)
         # Sets the `find_unused_parameters` parameter in
         # torch.nn.parallel.DistributedDataParallel
+        local_rank = dist.get_rank()
+        model = model.cuda(local_rank)
+        model.set_local_rank(local_rank)
+
         model = MMDistributedDataParallel(
-            model.cuda(),
+            model,
             device_ids=[torch.cuda.current_device()],
             broadcast_buffers=False,
             find_unused_parameters=find_unused_parameters)
+
     else:
         model = MMDataParallel(
             model.cuda(cfg.gpu_ids[0]), device_ids=cfg.gpu_ids)
@@ -204,16 +209,19 @@ def train_detector(model,
 
     runner_type = 'EpochBasedRunner' if 'runner' not in cfg else cfg.runner[
         'type']
+    random_seed = random.randint(0, 1000000)
     data_loaders = [
         build_mmdet_dataloader(
             ds,
             cfg.data.samples_per_gpu,
-            cfg.data.workers_per_gpu,
+            # cfg.data.workers_per_gpu,
+            1,
             # `num_gpus` will be ignored if distributed
             num_gpus=len(cfg.gpu_ids),
-            dist=distributed,
-            seed=cfg.seed,
+            dist=True,
+            seed=random_seed,
             runner_type=runner_type,
+            shuffle=True,
             persistent_workers=cfg.data.get('persistent_workers', False))
         for ds in dataset
     ]
@@ -223,6 +231,11 @@ def train_detector(model,
         find_unused_parameters = cfg.get('find_unused_parameters', False)
         # Sets the `find_unused_parameters` parameter in
         # torch.nn.parallel.DistributedDataParallel
+
+        local_rank = dist.get_rank()
+        model = model.cuda(local_rank)
+        model.set_local_rank(local_rank)
+
         model = MMDistributedDataParallel(
             model.cuda(),
             device_ids=[torch.cuda.current_device()],

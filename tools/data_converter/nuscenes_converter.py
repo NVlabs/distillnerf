@@ -213,6 +213,33 @@ def _fill_trainval_infos(nusc,
         # obtain sweeps for a single key-frame
         sd_rec = nusc.get('sample_data', sample['data']['LIDAR_TOP'])
         sweeps = []
+
+         # # find the index: 
+        # distance_to_the_end = 0
+        # if sample['next'] != '':
+        #     distance_to_the_end += 1
+        #     next_sample = nusc.get('sample', sample['next'])
+        #     while next_sample['next'] != '':
+        #         next_sample = nusc.get('sample', next_sample['next'])
+        #         distance_to_the_end += 1
+        #         # print(next_sample)
+
+        # import pdb; pdb.set_trace()
+        # import copy
+        # # skip the last n frames:
+        # skip_last = 5
+        # skip = False
+        # current_sample = copy.deepcopy(sample)
+        # for i in range(skip_last):
+        #     if current_sample['next'] == '':
+        #         skip = True
+        #         break
+        #     current_sample = nusc.get('sample', current_sample['next'])
+        # if skip: 
+        #     # import pdb; pdb.set_trace()
+        #     continue
+
+        # import pdb; pdb.set_trace()
         while len(sweeps) < max_sweeps:
             if not sd_rec['prev'] == '':
                 sweep = obtain_sensor2top(nusc, sd_rec['prev'], l2e_t,
@@ -221,6 +248,9 @@ def _fill_trainval_infos(nusc,
                 sd_rec = nusc.get('sample_data', sd_rec['prev'])
             else:
                 break
+        info['next'] = sample['next']
+        info['prev'] = sample['prev']
+
         info['sweeps'] = sweeps
         # obtain annotation
         if not test:
